@@ -1,0 +1,226 @@
+import numpy as np
+import torch
+import torch.nn as nn
+from torch_geometric.nn import ChebConv
+import torch.nn.functional as F
+from sklearn import linear_model
+from src.tools import string_to_list
+
+
+class LRUnivariate(nn.Module):
+    """Univariate multi-layer perceptron model.
+    Each node is treated independantly, thus it is equivalent to learning a different MLP
+    for each node.
+
+    Args:
+        n (int): number of nodes
+        f_in (int): dimension of node signal (number of previous time steps to use)
+        F (str): dimensions of hidden and last layers, string of comma-seperated integers
+        dropout (float): probability of an element being zeroed (default=0)
+        use_bn (bool): wether to use batch-normalisation (defulat=False)
+        bn_momentum (float): momentum for batch normalisation (default=0.1)
+    """
+
+    def __init__(self, n, f_in, F, dropout=0, use_bn=False, bn_momentum=0.1):
+        super(LRUnivariate, self).__init__()
+        layers = ()
+        F = string_to_list(F)
+        for i in range(len(F)):
+            if i == 0:
+                layers += (NonsharedFC(n, f_in, F[i]),)
+            else:
+                layers += (NonsharedFC(n, F[i - 1], F[i]),)
+            if i < len(F) - 1:
+                layers += (nn.ReLU(),)
+                if use_bn:
+                    layers += (nn.BatchNorm1d(n, momentum=bn_momentum),)
+                if dropout > 0:
+                    layers += (nn.Dropout(dropout),)
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x).view(x.shape[0], x.shape[1])
+
+    def predict(self, x):
+        x = torch.tensor(x, dtype=torch.float32, device=next(self.parameters()).device)
+        self.eval()
+        return self.forward(x).cpu().detach().numpy()
+
+
+class LRMultivariate(nn.Module):
+    """Multivariate multi-layer perceptron model.
+    Each node value is computed using all nodes values.
+
+    Args:
+        n (int): number of nodes
+        f_in (int): dimension of node signal (number of previous time steps to use)
+        F (str): dimensions of hidden and last layers, string of comma-seperated integers
+        dropout (float): probability of an element being zeroed, (default=0)
+        use_bn (bool): wether to use batch-normalisation (defulat=False)
+        bn_momentum (float): momentum for batch normalisation (default=0.1)
+    """
+
+    def __init__(self, n, f_in, F, dropout=0, use_bn=False, bn_momentum=0.1):
+        super(LRMultivariate, self).__init__()
+        layers = ()
+        F = string_to_list(F)
+        for i in range(len(F)):
+            if i == 0:
+                layers += (MultiFC(n, f_in, F[i]),)
+            else:
+                layers += (MultiFC(n, F[i - 1], F[i]),)
+            if i < len(F) - 1:
+                layers += (nn.ReLU(),)
+                if use_bn:
+                    layers += (nn.BatchNorm1d(n, momentum=bn_momentum),)
+                if dropout > 0:
+                    layers += (nn.Dropout(dropout),)
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x).view(x.shape[0], x.shape[1])
+
+    def predict(self, x):
+        x = torch.tensor(x, dtype=torch.float32, device=next(self.parameters()).device)
+        self.eval()
+        return self.forward(x).cpu().detach().numpy()
+
+
+class Chebnet(nn.Module):
+    """Chebnet model.
+    Pytorch adaptation of the model proposed in https://github.com/mdeff/cnn_graph
+
+    Args:
+        n_emb (int): number of nodes
+        seq_len (int): sequence length
+        edge_index (tuple of numpy arrays): edges of the graph connectivity in COO format
+        FK (str): string of comma-seperated integers, interlaced list of F and K with:
+            F the list of the numbers of output features for each layer (e.g. '4,4,2')
+            K the list of the orders of the Tchebychev polynomial for each layer
+            The list is a str with comma seperated digits, e.g. for F = [16,8,8] and K = [3,3,1] FK is
+            '16,3,8,3,8,1'.
+        M (str): dimensionality of FC layers, string of comma-seperated integers
+        FC_type (str): type of FC layers, choices are :
+            'shared_uni': every node use the same FC layer that uses as input only the features of
+                the node (univariate)
+            'nonshared_uni': each node uses a specific FC layer that uses as input only the features
+                of the node (univariate)
+            'multi': output of each node is computed from features of every node (multivariate)
+        dropout (float): probability of an element being zeroed (default=0)
+        bn_momentum (float): momentum for batch normalisation (default=0.1)
+        use_bn (bool): wether to use batch-normalisation (default=True)
+    """
+
+    def __init__(
+        self,
+        n_emb,
+        seq_len,
+        edge_index,
+        FK,
+        M,
+        FC_type,
+        dropout=0,
+        bn_momentum=0.1,
+        use_bn=True,
+    ):
+        super(Chebnet, self).__init__()
+        FK = string_to_list(FK)
+        F = FK[::2]
+        K = FK[1::2]
+        M = string_to_list(M)
+
+        F.insert(0, seq_len)
+
+        layers = []
+        for i in range(len(K)):
+            layers.append(ChebConv(F[i], F[i + 1], K[i]))
+            layers.append(nn.ReLU())
+            if use_bn:
+                layers.append(nn.BatchNorm1d(n_emb, momentum=bn_momentum))
+            layers.append(nn.Dropout(dropout))
+
+        if FC_type == "shared_uni":
+            make_FC_layer = nn.Linear
+        elif FC_type == "nonshared_uni":
+            make_FC_layer = lambda f_in, f_out: NonsharedFC(n_emb, f_in, f_out)
+        elif FC_type == "multi":
+            make_FC_layer = lambda f_in, f_out: MultiFC(n_emb, f_in, f_out)
+        else:
+            raise ValueError(
+                f"Invalid FC_type : '{FC_type}'. Valid values are 'shared_uni', 'nonshared_uni', 'multi'."
+            )
+
+        for i in range(len(M)):
+            if i == 0:
+                layers.append(make_FC_layer(F[-1], M[i]))
+            else:
+                layers.append(nn.Dropout(dropout))
+                layers.append(make_FC_layer(M[i - 1], M[i]))
+            if i < len(M) - 1:
+                layers.append(nn.ReLU())
+                if use_bn:
+                    layers.append(nn.BatchNorm1d(n_emb, momentum=bn_momentum))
+
+        self.layers = nn.ModuleList(layers)
+        self.use_bn = use_bn
+        self.FC_type = FC_type
+        self.edge_index = torch.tensor(np.array(edge_index), dtype=torch.long)
+
+    def forward(self, x):
+        for layer in self.layers:
+            if "ChebConv" in layer.__str__():
+                if next(self.parameters()).is_cuda:
+                    x = layer(x, self.edge_index.cuda())
+                else:
+                    x = layer(x, self.edge_index)
+            else:
+                x = layer(x)
+        return x.view((x.shape[0], x.shape[1]))
+
+    def predict(self, x):
+        x = torch.tensor(x, dtype=torch.float32, device=next(self.parameters()).device)
+        self.eval()
+        return self.forward(x).cpu().detach().numpy()
+
+
+class MultiFC(nn.Module):
+    """Fully connected layer, connecting all nodes together (for multivariate models).
+
+    Args:
+        n (int): number of nodes
+        f_in (int): dimension of input signal of each node
+        f_out (int): dimension of output signal of each node
+    """
+
+    def __init__(self, n, f_in, f_out):
+        super(MultiFC, self).__init__()
+        self.fc = nn.Linear(n * f_in, n * f_out)
+        self.n = n
+        self.f_out = f_out
+
+    def forward(self, x):
+        y = x.view((x.shape[0], -1))
+        y = self.fc(y)
+        y = y.view((x.shape[0], self.n, self.f_out))
+        return y
+
+
+class NonsharedFC(nn.Module):
+    """Layer connecing independantly features of each node, with different weights for each node
+    (for univariate models).
+
+    Args:
+        n (int): number of nodes
+        f_in (int): dimension of input signal of each node
+        f_out (int): dimension of output signal of each node
+        init_scale (float): scale of the normal initialization of weights (default=0.1)
+    """
+
+    def __init__(self, n, f_in, f_out, init_scale=0.1):
+        super(NonsharedFC, self).__init__()
+        self.w = nn.Parameter(init_scale * torch.randn(n, f_in, f_out))
+        self.b = nn.Parameter(init_scale * torch.randn(n, f_out))
+
+    def forward(self, x):
+        y = (x[:, :, :, None] * self.w[None, :, :, :]).sum(2) + self.b
+        return y
