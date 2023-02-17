@@ -2,6 +2,8 @@
 
 This repo contains the code for the paper "A benchmark of individual auto-regressive models in a massive fMRI dataset".
 
+![graphical_abstract](images/Graphical_abstract.jpg)
+
 Several deep learning architectures are trained to predict the evolution of BOLD time series.
 The code allows to perform gridsearch on each one of the architecture, to compare them and find the model architecture that is the most appropriate for BOLD time series auto-regression.
 
@@ -32,5 +34,3 @@ TODO
 ## Paper results
 
 TODO
-
- 
