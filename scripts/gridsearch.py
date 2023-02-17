@@ -1,4 +1,3 @@
-print("importing")
 import os
 import csv
 from itertools import product as itertools_product
@@ -10,7 +9,6 @@ import darts.models
 from src.models.train_model import train
 from src.models.train_darts_model import train as train_darts
 from src.data.load_data import load_data, load_params, make_input_labels, load_darts_timeseries
-from src.models.models import models_needing_edge_index
 
 
 def main():
@@ -76,7 +74,7 @@ def main():
     # Set default values of params if necessary
     standardize = params["standardize"] if "standardize" in params else False
     shuffle = params["shuffle"] if "shuffle" in params else False
-    compute_edge_index = params["model"] in models_needing_edge_index
+    compute_edge_index = params["model"] == "Chebnet"
     thres = params["edge_index_thres"] if compute_edge_index else None
 
     # Load data

@@ -15,7 +15,6 @@ from src.data.load_data import (
     load_darts_timeseries,
 )
 from src.tools import check_path
-from src.models.models import models_needing_edge_index
 from src.models.train_model import train
 from src.models.train_darts_model import train as train_darts
 from src.models.train_darts_model import compute_R2
@@ -54,7 +53,7 @@ def main():
         params["val_data_file"] = os.path.join(args.base_dir, params["val_data_file"])
         params["test_data_file"] = os.path.join(args.base_dir, params["test_data_file"])
     standardize = params["standardize"] if "standardize" in params else False
-    compute_edge_index = params["model"] in models_needing_edge_index
+    compute_edge_index = params["model"] == "Chebnet"
     thres = params["edge_index_thres"] if compute_edge_index else None
     output_dir = check_path(args.output_dir)
     os.makedirs(output_dir)

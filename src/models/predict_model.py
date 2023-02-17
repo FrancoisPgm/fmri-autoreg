@@ -6,8 +6,7 @@ import pickle as pk
 from math import ceil
 from tqdm.auto import tqdm
 from sklearn.metrics import r2_score
-from src.data.load_data import load_params, load_data, make_input_labels, get_vox_path
-from src.models.models import models_needing_edge_index
+from src.data.load_data import load_params, load_data, make_input_labels
 
 
 def predict_model(model, params, data_file, task_filter):

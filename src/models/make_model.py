@@ -6,15 +6,8 @@ from torch.nn import MSELoss
 from src.data.load_data import Dataset
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
-from src.models.models import (
-    LSTM,
-    Chebnet,
-    Ridge,
-    Lasso,
-    GRU,
-    LRUnivariate,
-    LRMultivariate,
-)
+from src.models.models import Chebnet, LRUnivariate, LRMultivariate
+
 from src.tools import string_to_list
 
 

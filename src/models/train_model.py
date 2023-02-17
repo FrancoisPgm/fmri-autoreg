@@ -6,7 +6,7 @@ import pickle as pk
 import csv
 from math import ceil
 from sklearn.metrics import r2_score
-from src.data.load_data import load_params, load_data, make_input_labels, get_vox_path
+from src.data.load_data import load_params, load_data, make_input_labels
 from src.models.make_model import make_model
 from src.tools import check_path
 

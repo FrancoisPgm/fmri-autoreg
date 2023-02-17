@@ -5,7 +5,7 @@ from glob import glob
 import nilearn.input_data
 import nilearn.interfaces
 import pickle as pk
-from tqdm.rich import tqdm
+from tqdm import tqdm
 
 
 LOAD_CONFOUNDS_PARAMS = {

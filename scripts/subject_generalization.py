@@ -9,7 +9,7 @@ import pickle as pk
 from tqdm import tqdm
 from src.data.load_data import load_params
 from src.tools import load_model
-from src.predict_model import predict_horizon
+from src.models.predict_model import predict_horizon
 
 SUBS = [f"sub-0{i}" for i in range(1, 7)]
 HORIZON = 6
