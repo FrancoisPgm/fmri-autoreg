@@ -7,7 +7,23 @@ The code allows to perform gridsearch on each one of the architecture, to compar
 
 ## Installation
 
-TODO
+Install torch 1.12.1:
+
+`pip install torch==1.12.1`
+
+Install torch geometric dependancies:
+
+`pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cpu.html`
+
+> **Note:** this installs the cpu version of torch_geometric, to use cuda acceleration see the [torch geometric documentation](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html) for the command that corresponds to your cuda version.
+
+Install the rest of the dependancies:
+
+`pip install -r requirements.txt`
+
+Install this repo as a local module:
+
+`pip install -e .`
 
 ## How to use
 
