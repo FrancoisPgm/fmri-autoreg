@@ -35,9 +35,9 @@ def load_data(path, task_filter=None, standardize=False, shuffle=False):
     """
     data_list = []
     with h5py.File(path, "r") as h5file:
-        for key in list(h5file.keys()):
-            if task_filter is None or re.search(task_filter, key):
-                data_list.append(h5file[key][:])
+        for dset in _traverse_datasets(h5file):
+            if task_filter is None or re.search(task_filter, dset):
+                data_list.append(h5file[dset][:])
     if standardize and data_list:
         means = np.concatenate(data_list, axis=0).mean(axis=0)
         stds = np.concatenate(data_list, axis=0).std(axis=0)
@@ -46,6 +46,23 @@ def load_data(path, task_filter=None, standardize=False, shuffle=False):
         rng = np.random.default_rng()
         data_list = [rng.shuffle(d) for d in data_list]
     return data_list
+
+
+def _traverse_datasets(hdf_file):
+    """Load nested hdf5 files.
+    https://stackoverflow.com/questions/51548551/reading-nested-h5-group-into-numpy-array
+    """
+    def h5py_dataset_iterator(g, prefix=''):
+        for key in g.keys():
+            item = g[key]
+            path = f'{prefix}/{key}'
+            if isinstance(item, h5py.Dataset): # test for dataset
+                yield (path, item)
+            elif isinstance(item, h5py.Group): # test for group (go down)
+                yield from h5py_dataset_iterator(item, path)
+
+    for path, _ in h5py_dataset_iterator(hdf_file):
+        yield path
 
 
 def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=False):
