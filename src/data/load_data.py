@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import re
 import numpy as np
@@ -13,6 +14,8 @@ from sklearn.preprocessing import StandardScaler
 
 def load_params(params):
     """Load parameters from json file or json string."""
+    if isinstance(params, Path):
+        params = str(params)
     if os.path.splitext(params)[1] == ".json":
         with open(params) as json_file:
             param_dict = json.load(json_file)

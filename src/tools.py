@@ -1,3 +1,4 @@
+from pathlib import Path
 import os
 import torch
 import inspect
@@ -12,6 +13,8 @@ def check_path(path, verbose=True):
     new path with _<n> appended (n being the number of paths with the same name
     that exist already).
     """
+    if isinstance(path, Path):
+        path = str(path)
     path = os.path.normpath(path)
     path_wo_ext, ext = os.path.splitext(path)
 
