@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch_geometric.nn import ChebConv
 import torch.nn.functional as F
 from sklearn import linear_model
-from src.tools import string_to_list
+from fmri_autoreg.tools import string_to_list
 
 
 class LRUnivariate(nn.Module):

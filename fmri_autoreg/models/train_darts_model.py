@@ -8,8 +8,8 @@ from copy import deepcopy
 import argparse
 import pickle as pk
 from sklearn.metrics import r2_score
-from src.data.load_data import load_params, load_darts_timeseries
-from src.tools import check_path
+from fmri_autoreg.data.load_data import load_params, load_darts_timeseries
+from fmri_autoreg.tools import check_path
 
 
 def compute_R2(series_list, model, horizon, start, verbose=False):

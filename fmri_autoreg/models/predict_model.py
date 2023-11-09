@@ -6,7 +6,7 @@ import pickle as pk
 from math import ceil
 from tqdm.auto import tqdm
 from sklearn.metrics import r2_score
-from src.data.load_data import load_params, load_data, make_input_labels
+from fmri_autoreg.data.load_data import load_params, load_data, make_input_labels
 
 
 def predict_model(model, params, data_file, task_filter):

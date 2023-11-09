@@ -3,12 +3,12 @@ from tqdm.auto import tqdm
 from torch import optim
 from sklearn.metrics import r2_score
 from torch.nn import MSELoss
-from src.data.load_data import Dataset
+from fmri_autoreg.data.load_data import Dataset
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
-from src.models.models import Chebnet, LRUnivariate, LRMultivariate
+from fmri_autoreg.models.models import Chebnet, LRUnivariate, LRMultivariate
 
-from src.tools import string_to_list
+from fmri_autoreg.tools import string_to_list
 
 
 NUM_WORKERS = 2

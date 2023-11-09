@@ -5,7 +5,7 @@ import inspect
 import pickle as pk
 import numpy as np
 from glob import glob
-from src.data.load_data import load_params
+from fmri_autoreg.data.load_data import load_params
 
 
 def check_path(path, verbose=True):
