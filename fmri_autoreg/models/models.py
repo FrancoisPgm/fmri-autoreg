@@ -183,6 +183,79 @@ class Chebnet(nn.Module):
         return self.forward(x).cpu().detach().numpy()
 
 
+class LinearChebnet(nn.Module):
+    """Chebnet model without the nonlinear activation functions (ReLU)."""
+
+    def __init__(
+        self,
+        n_emb,
+        seq_len,
+        edge_index,
+        FK,
+        M,
+        FC_type,
+        dropout=0,
+        bn_momentum=0.1,
+        use_bn=True,
+    ):
+        super(LinearChebnet, self).__init__()
+        FK = string_to_list(FK)
+        F = FK[::2]
+        K = FK[1::2]
+        M = string_to_list(M)
+
+        F.insert(0, seq_len)
+
+        layers = []
+        for i in range(len(K)):
+            layers.append(ChebConv(F[i], F[i + 1], K[i]))
+            if use_bn:
+                layers.append(nn.BatchNorm1d(n_emb, momentum=bn_momentum))
+            layers.append(nn.Dropout(dropout))
+
+        if FC_type == "shared_uni":
+            make_FC_layer = nn.Linear
+        elif FC_type == "nonshared_uni":
+            make_FC_layer = lambda f_in, f_out: NonsharedFC(n_emb, f_in, f_out)
+        elif FC_type == "multi":
+            make_FC_layer = lambda f_in, f_out: MultiFC(n_emb, f_in, f_out)
+        else:
+            raise ValueError(
+                f"Invalid FC_type : '{FC_type}'. Valid values are 'shared_uni', 'nonshared_uni', 'multi'."
+            )
+
+        for i in range(len(M)):
+            if i == 0:
+                layers.append(make_FC_layer(F[-1], M[i]))
+            else:
+                layers.append(nn.Dropout(dropout))
+                layers.append(make_FC_layer(M[i - 1], M[i]))
+            if i < len(M) - 1:
+                if use_bn:
+                    layers.append(nn.BatchNorm1d(n_emb, momentum=bn_momentum))
+
+        self.layers = nn.ModuleList(layers)
+        self.use_bn = use_bn
+        self.FC_type = FC_type
+        self.edge_index = torch.tensor(np.array(edge_index), dtype=torch.long)
+
+    def forward(self, x):
+        for layer in self.layers:
+            if "ChebConv" in layer.__str__():
+                if next(self.parameters()).is_cuda:
+                    x = layer(x, self.edge_index.cuda())
+                else:
+                    x = layer(x, self.edge_index)
+            else:
+                x = layer(x)
+        return x.view((x.shape[0], x.shape[1]))
+
+    def predict(self, x):
+        x = torch.tensor(x, dtype=torch.float32, device=next(self.parameters()).device)
+        self.eval()
+        return self.forward(x).cpu().detach().numpy()
+
+
 class MultiFC(nn.Module):
     """Fully connected layer, connecting all nodes together (for multivariate models).
 

@@ -6,7 +6,7 @@ from torch.nn import MSELoss
 from fmri_autoreg.data.load_data import Dataset
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
-from fmri_autoreg.models.models import Chebnet, LRUnivariate, LRMultivariate
+from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRMultivariate
 
 from fmri_autoreg.tools import string_to_list
 
@@ -81,7 +81,19 @@ def make_model(params, n_emb, edge_index):
             params["use_bn"],
         )
         return model, train_backprop
-
+    elif params["model"] == "LinearChebnet":
+        model = LinearChebnet(
+            n_emb,
+            params["seq_length"],
+            edge_index,
+            params["FK"],
+            params["M"],
+            params["FC_type"],
+            params["dropout"],
+            params["bn_momentum"],
+            params["use_bn"],
+        )
+        return model, train_backprop
 
 def model_fit(model, X_tng, Y_tng, verbose=1, **kwargs):
     """Wrapper for model's fit method, to be consistent with backprop training method's outputs."""
