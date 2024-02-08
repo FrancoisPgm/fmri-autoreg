@@ -1,12 +1,13 @@
 import numpy as np
 import warnings
+import h5py
 import os
 import argparse
 import pickle as pk
 from math import ceil
 from tqdm.auto import tqdm
 from sklearn.metrics import r2_score
-from fmri_autoreg.data.load_data import load_params, load_data, make_input_labels
+from fmri_autoreg.data.load_data import load_params, make_input_labels
 
 
 def predict_model(model, params, data_file, task_filter):
@@ -32,18 +33,15 @@ def predict_model(model, params, data_file, task_filter):
 
 
 def predict_horizon(
-    model, seq_length, horizon, data_file, task_filter, batch_size, stride=1, standardize=False
+    model, seq_length, horizon, data_file, dset_path, batch_size, stride=1, standardize=False
 ):
     """For models trained to predict t+1, reuse predictions to iteratively predict to t+horizon."""
-    data_list = load_data(
-        data_file,
-        task_filter=task_filter,
-        standardize=standardize,
-    )
+    with h5py.File(data_file, "r") as h5file:
+        data_list = [h5file[dset_path][:]]
     X = make_input_labels(data_list, [], seq_length + horizon, stride, 0)[0]
     del data_list
     if not len(X):
-        warnings.warn(f"No data found in {data_file} for task {task_filter}", RuntimeWarning)
+        warnings.warn(f"No data found in {data_file} for {dset_path}", RuntimeWarning)
         return (None,) * 3
     Z = []
     Y = X[:, :, seq_length:]
