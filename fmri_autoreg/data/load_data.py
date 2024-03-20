@@ -197,7 +197,6 @@ def make_seq(data_list, length, stride=1, lag=1):
     return X_tot, Y_tot
 
 
-
 def get_edge_index(data_file, dset_paths, threshold=0.9):
     """Create connectivity matrix with more memory efficient way.
 
