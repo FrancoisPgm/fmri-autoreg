@@ -6,30 +6,37 @@ import argparse
 import pickle as pk
 from math import ceil
 from tqdm.auto import tqdm
+from torch.utils.data import DataLoader
+from torch.cuda import is_available as cuda_is_available
 from sklearn.metrics import r2_score
-from fmri_autoreg.data.load_data import load_params, make_input_labels
+from fmri_autoreg.data.load_data import load_params, make_input_labels, Dataset
 
 
-def predict_model(model, params, data_file, task_filter):
+def predict_model(model, params, dset):
     """Use trained model to predict on data and compute R2 score."""
-    data_list = load_data(
-        data_file,
-        task_filter=task_filter,
-        standardize=params["standardize"] if "standardize" in params else False,
-    )
-
-    X, Y, _, _, edge_index = make_input_labels(
-        data_list,
-        [],
+    dataset = Dataset(
+        params["data_file"],
+        dset,
         params["seq_length"],
         params["time_stride"],
         params["lag"],
     )
-    del data_list
-    batch_size = len(X) if not "batch_size" in params else params["batch_size"]
-    Z = np.concatenate([model.predict(x) for x in np.array_split(X, ceil(X.shape[0] / batch_size))])
-    r2 = r2_score(Y, Z, multioutput="raw_values")
-    return r2, Z, Y
+    dataloader = DataLoader(
+        dataset,
+        batch_size=params["batch_size"],
+        shuffle=True,
+        drop_last=True,
+        num_workers=params["num_workers"],
+        pin_memory=cuda_is_available()
+    )
+    r2 = []
+    for sampled_batch in dataloader:
+        x, y = sampled_batch
+        z = model.predict(x)
+        batch_r2 = r2_score(y, z, multioutput="raw_values")
+        r2.append(batch_r2)
+    r2 = np.concatenate(r2, axis=0)
+    return r2
 
 
 def predict_horizon(
@@ -62,38 +69,3 @@ def predict_horizon(
 
     return np.array(r2), Z, Y
 
-
-def main():
-    """Use trained model to predict on data and save R2 score, prediction and labels."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", "-m", type=str, help="Path to model file or dir.")
-    parser.add_argument("--data_file", "-f", type=str, help="Path to data HDF5 file.")
-    parser.add_argument(
-        "--task_filter", "-t", type=str, default="", help="Regex to filter run names."
-    )
-    parser.add_argument("--out_dir", "-o", type=str, help="Path to output directory.")
-    parser.add_argument("--tag", type=str, default="", help="Tag to append to output file names.")
-    parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level.")
-    args = parser.parse_args()
-
-    model_path = (
-        args.model if os.path.splitext(args.model)[1] else os.path.join(args.model, "model.pkl")
-    )
-    out_dir = args.out_dir if args.out_dir else os.path.dirname(model_path)
-
-    model = pk.load(open(model_path, "rb"))
-    params = load_params(os.path.join(os.path.dirname(model_path), "params.json"))
-
-    r2, Z, Y = predict_model(model, params, args.data_file, task_filter)
-    if args.verbosity:
-        print("mean r2 score :", r2.mean())
-
-    tag = "_" + args.tag if args.tag else ""
-
-    np.save(os.path.join(out_dir, "r2_prediction" + tag + ".npy"), r2)
-    np.save(os.path.join(out_dir, "Y_prediction" + tag + ".npy"), Y)
-    np.save(os.path.join(out_dir, "Z_prediction" + tag + ".npy"), Z)
-
-
-if __name__ == "__main__":
-    main()

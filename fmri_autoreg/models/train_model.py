@@ -8,12 +8,11 @@ from math import ceil
 from sklearn.metrics import r2_score
 from fmri_autoreg.data.load_data import load_data, Dataset
 from fmri_autoreg.models.make_model import make_model
+from fmri_autoreg.models.predict_model import predict_model
 from fmri_autoreg.tools import check_path
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 
-NUM_WORKERS = 4
-DEVICE = "cuda:0"
 
 def train(params, data, verbose=1):
     """Train a model according to params dict.
@@ -48,18 +47,17 @@ def train(params, data, verbose=1):
 
     # make model
     model, train_model = make_model(params, n_emb, edge_index)
-    if verbose:
-        print("model made")
-
     tng_dataset = Dataset(
+        params["data_file"],
         X_tng_dsets,
-        params["model"]["seq_length"],
+        params["seq_length"],
         params["time_stride"],
         params["lag"]
     )
     val_dataset = Dataset(
+        params["data_file"],
         X_val_dsets,
-        params["model"]["seq_length"],
+        params["seq_length"],
         params["time_stride"],
         params["lag"]
     )
@@ -68,7 +66,7 @@ def train(params, data, verbose=1):
         batch_size=params["batch_size"],
         shuffle=True,
         drop_last=True,
-        num_workers=NUM_WORKERS,
+        num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )
     val_dataloader = DataLoader(
@@ -76,7 +74,7 @@ def train(params, data, verbose=1):
         batch_size=params["batch_size"],
         shuffle=True,
         drop_last=True,
-        num_workers=NUM_WORKERS,
+        num_workers=params["num_workers"],
         pin_memory=cuda_is_available()
     )
 
@@ -92,22 +90,11 @@ def train(params, data, verbose=1):
     # compute r2 score
     r2_mean = {}
     for name, dset in zip(["tng", "val"], [X_tng_dsets, X_val_dsets]):
-        dataloader = DataLoader(
-            dset,
-            batch_size=params["batch_size"],
-            shuffle=True,
-            drop_last=True,
-            num_workers=NUM_WORKERS,
-            pin_memory=cuda_is_available()
+        r2 = predict_model(
+            model=model,
+            params=params,
+            data_file=params["data_file"],
+            dset=dset,
         )
-        r2 = []
-        for sampled_batch in dataloader:
-            x, y = sampled_batch
-            z = model.predict(x)
-            batch_r2 = r2_score(y, z, multioutput="raw_values")
-            r2.append(batch_r2)
         r2_mean[name] = np.mean(r2)
-    if verbose:
-        print(f"tng mean r2 : {r2_mean['tng']}, val mean r2 : {r2_mean['val']}")
-
     return model, r2_mean['tng'], r2_mean['val'], losses, checkpoints

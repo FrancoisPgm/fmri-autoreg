@@ -13,7 +13,6 @@ from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRM
 from fmri_autoreg.tools import string_to_list
 
 
-NUM_WORKERS = 4
 DEVICE = "cuda:0"
 
 
