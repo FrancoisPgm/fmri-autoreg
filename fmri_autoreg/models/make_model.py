@@ -2,8 +2,10 @@ import numpy as np
 from tqdm.auto import tqdm
 from torch import optim
 from sklearn.metrics import r2_score
+from sklearn.linear_model import Ridge, Lasso
 from torch.nn import MSELoss
 from fmri_autoreg.data.load_data import Dataset
+from torch.nn import LSTM, GRU
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
 from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRMultivariate
@@ -11,7 +13,7 @@ from fmri_autoreg.models.models import Chebnet, LinearChebnet, LRUnivariate, LRM
 from fmri_autoreg.tools import string_to_list
 
 
-NUM_WORKERS = 2
+NUM_WORKERS = 4
 DEVICE = "cuda:0"
 
 
@@ -109,25 +111,10 @@ def iter_fun(iterator, verbose):
     return iterator
 
 
-def train_backprop(model, X_tng, Y_tng, X_val, Y_val, params, verbose=1):
+def train_backprop(model, params, tng_dataloader, val_dataloader, verbose=1):
     """Backprop training of pytorch models, with epoch training loop. Returns trained model,
     losses and checkpoints."""
-    tng_dataset = Dataset(X_tng, Y_tng)
-    val_dataset = Dataset(X_val, Y_val)
-    tng_dataloader = DataLoader(
-        tng_dataset,
-        batch_size=params["batch_size"],
-        shuffle=True,
-        drop_last=True,
-        num_workers=NUM_WORKERS,
-    )
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=params["batch_size"],
-        shuffle=True,
-        drop_last=True,
-        num_workers=NUM_WORKERS,
-    )
+
     if not cuda_is_available():
         device = "cpu"
         print("CUDA not available, running on CPU.")

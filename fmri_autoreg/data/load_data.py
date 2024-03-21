@@ -235,13 +235,27 @@ def get_edge_index(data_file, dset_paths, threshold=0.9):
 class Dataset:
     """Simple dataset for pytorch training loop"""
 
-    def __init__(self, X, Y):
-        self.inputs = [torch.tensor(x, dtype=torch.float32) for x in X]
-        self.labels = [torch.tensor(y, dtype=torch.float32) for y in Y]
+    def __init__(self, data_file, dset_paths, seq_length, time_stride, lag):
+        self.data_file = data_file
+        self.dset_paths = dset_paths
+        self.param = {"length": seq_length, "stride": time_stride, "lag": lag}
 
     def __len__(self):
-        return len(self.inputs)
+        return len(self.dset_paths)
 
     def __getitem__(self, index):
-        sample = {"input": self.inputs[index], "label": self.labels[index]}
+        sample_dset = self.dset_paths[index]
+        # read the data
+        input = load_data(
+            path=self.data_file,
+            h5dset_path=sample_dset,
+            standardize=False,
+            dtype="data"
+        )
+        # generate lables
+        X, Y = make_seq(input, **self.param)
+        sample = {
+            "input": [torch.tensor(x, dtype=torch.float32) for x in X],
+            "label": [torch.tensor(y, dtype=torch.float32) for y in Y]
+        }
         return sample
