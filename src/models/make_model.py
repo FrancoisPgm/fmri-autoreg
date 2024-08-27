@@ -3,11 +3,11 @@ from tqdm.auto import tqdm
 from torch import optim
 from sklearn.metrics import r2_score
 from torch.nn import MSELoss
-from src.data.load_data import Dataset
 from torch.utils.data import DataLoader
 from torch.cuda import is_available as cuda_is_available
-from src.models.models import Chebnet, LRUnivariate, LRMultivariate
 
+from src.data.load_data import Dataset
+from src.models.models import Chebnet, LRUnivariate, LRMultivariate
 from src.tools import string_to_list
 
 
@@ -18,15 +18,7 @@ DEVICE = "cuda:0"
 def make_model(params, n_emb, edge_index):
     """Create a model according to given parameters, returns model and fitting function."""
 
-    if params["model"] == "Ridge":
-        model = Ridge(alpha=params["alpha"])
-        return model, model_fit
-
-    elif params["model"] == "Lasso":
-        model = Lasso(alpha=params["alpha"])
-        return model, model_fit
-
-    elif params["model"] == "LRUnivariate":
+    if params["model"] == "LRUnivariate":
         model = LRUnivariate(
             n_emb,
             params["seq_length"],
@@ -45,26 +37,6 @@ def make_model(params, n_emb, edge_index):
             params["dropout"],
             params["use_bn"],
             params["bn_momentum"],
-        )
-        return model, train_backprop
-
-    elif params["model"] == "LSTM":
-        model = LSTM(
-            n_emb,
-            params["hidden_size"],
-            params["num_layers"],
-            params["random_initial_state"],
-            params["dropout"],
-        )
-        return model, train_backprop
-
-    elif params["model"] == "GRU":
-        model = GRU(
-            n_emb,
-            params["hidden_size"],
-            params["num_layers"],
-            params["random_initial_state"],
-            params["dropout"],
         )
         return model, train_backprop
 
@@ -125,7 +97,9 @@ def train_backprop(model, X_tng, Y_tng, X_val, Y_val, params, verbose=1):
             print(f"Using device {device}")
 
     model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"])
+    optimizer = optim.Adam(
+        model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"]
+    )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         factor=0.1,

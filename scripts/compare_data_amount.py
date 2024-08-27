@@ -1,45 +1,22 @@
 import os
 import csv
 import re
-import h5py
 import numpy as np
 import argparse
-from tqdm import tqdm
-import numpy as np
+
 from src.models.train_model import train
 from src.models.predict_model import predict_horizon
 from src.data.load_data import load_data, load_params, make_input_labels
-from src.tools import check_path
 
 
-SUBS = [f"sub-0{i}" for i in range(1, 2)]
 HORIZON = 6
 rng = np.random.default_rng(2022)
 
 
-def main():
+def main(args):
     """Train a model with different amount of training data and save scores."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", "-o", type=str, help="Output path.")
-    parser.add_argument(
-        "--base_dir", "-b", type=str, default=None, help="Base directory for data files."
-    )
-    parser.add_argument(
-        "--param",
-        "-p",
-        type=str,
-        help="Path to the json file containing the hyper-parameters value to use.",
-    )
-    parser.add_argument("--verbose", "-v", type=int, default=0, help="Level of verbosity.")
-    parser.add_argument("-n", type=int, help="Number of runs to use.")
-    parser.add_argument("--sub", type=str, help="Subject.")
-    args = parser.parse_args()
-
     params = load_params(args.param)
     batch_size = params["batch_size"] if "batch_size" in params else 100
-    if args.base_dir is not None:
-        params["tng_data_file"] = os.path.join(args.base_dir, params["tng_data_file"])
-        params["val_data_file"] = os.path.join(args.base_dir, params["val_data_file"])
 
     fieldnames = list(params.keys()) + [
         "r2_mean_tng",
@@ -100,4 +77,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", "-o", type=str, help="Output path.")
+    parser.add_argument(
+        "--param",
+        "-p",
+        type=str,
+        help="Path to the json file containing the hyper-parameters.",
+    )
+    parser.add_argument(
+        "--verbose", "-v", type=int, default=0, help="Level of verbosity."
+    )
+    parser.add_argument("-n", type=int, help="Number of runs to use.")
+    parser.add_argument("--sub", type=str, help="Subject.")
+    args = parser.parse_args()
+    main(args)

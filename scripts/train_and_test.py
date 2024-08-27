@@ -4,9 +4,9 @@ import re
 import argparse
 import json
 import pickle as pk
-import csv
 from math import ceil
 from sklearn.metrics import r2_score
+
 from src.data.load_data import (
     load_params,
     load_data,
@@ -25,33 +25,9 @@ ATLASES = ["mist_197"]
 LAGS = list(range(1, 7))
 
 
-def main():
+def main(args):
     """Train model using parameters dict and save results."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
-    parser.add_argument("--param", "-p", type=str, help="Parameters : path to json file or dict")
-    parser.add_argument("--is_darts", action="store_true")
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        type=int,
-        default=1,
-        help="Verbosity level, 0 to 2. Default is 1.",
-    )
-    parser.add_argument(
-        "--base_dir",
-        "-b",
-        type=str,
-        help="Base directory for data files.",
-        default=None,
-    )
-    args = parser.parse_args()
-
     params = load_params(args.param)
-    if args.base_dir:
-        params["tng_data_file"] = os.path.join(args.base_dir, params["tng_data_file"])
-        params["val_data_file"] = os.path.join(args.base_dir, params["val_data_file"])
-        params["test_data_file"] = os.path.join(args.base_dir, params["test_data_file"])
     standardize = params["standardize"] if "standardize" in params else False
     compute_edge_index = params["model"] == "Chebnet"
     thres = params["edge_index_thres"] if compute_edge_index else None
@@ -63,9 +39,15 @@ def main():
         params["val_data_file"] = re.sub("sub-0[1-6]", sub, params["val_data_file"])
         params["test_data_file"] = re.sub("sub-0[1-6]", sub, params["test_data_file"])
         for atlas in ATLASES:
-            params["tng_data_file"] = re.sub("mist_[0-9]+", atlas, params["tng_data_file"])
-            params["val_data_file"] = re.sub("mist_[0-9]+", atlas, params["val_data_file"])
-            params["test_data_file"] = re.sub("mist_[0-9]+", atlas, params["test_data_file"])
+            params["tng_data_file"] = re.sub(
+                "mist_[0-9]+", atlas, params["tng_data_file"]
+            )
+            params["val_data_file"] = re.sub(
+                "mist_[0-9]+", atlas, params["val_data_file"]
+            )
+            params["test_data_file"] = re.sub(
+                "mist_[0-9]+", atlas, params["test_data_file"]
+            )
 
             if args.is_darts:
                 if args.verbose:
@@ -102,9 +84,13 @@ def main():
                     horizon = params["horizon"]
                 else:
                     horizon = (
-                        model.output_chunk_length if hasattr(model, "output_chunk_length") else 1
+                        model.output_chunk_length
+                        if hasattr(model, "output_chunk_length")
+                        else 1
                     )
-                test_R2 = compute_R2(test_series, model, horizon, start, args.verbose > 2)
+                test_R2 = compute_R2(
+                    test_series, model, horizon, start, args.verbose > 2
+                )
 
                 np.save(os.path.join(out_subdir, "tng_R2.npy"), val_R2)
                 np.save(os.path.join(out_subdir, "val_R2.npy"), val_R2)
@@ -131,7 +117,9 @@ def main():
                         params["val_data_file"], params["val_task_filter"], standardize
                     )
                     test_data = load_data(
-                        params["test_data_file"], params["test_task_filter"], standardize
+                        params["test_data_file"],
+                        params["test_task_filter"],
+                        standardize,
                     )
 
                     if not tng_data or not val_data or not test_data:
@@ -155,14 +143,23 @@ def main():
                     )
 
                     X_test, Y_test = make_seq(
-                        test_data, params["seq_length"], params["time_stride"], params["lag"]
+                        test_data,
+                        params["seq_length"],
+                        params["time_stride"],
+                        params["lag"],
                     )
                     del test_data
-                    batch_size = len(X_tng) if not "batch_size" in params else params["batch_size"]
+                    batch_size = (
+                        len(X_test)
+                        if "batch_size" not in params
+                        else params["batch_size"]
+                    )
                     Z_test = np.concatenate(
                         [
                             model.predict(x)
-                            for x in np.array_split(X_test, ceil(X_test.shape[0] / batch_size))
+                            for x in np.array_split(
+                                X_test, ceil(X_test.shape[0] / batch_size)
+                            )
                         ]
                     )
                     r2_test = r2_score(Y_test, Z_test, multioutput="raw_values")
@@ -186,4 +183,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
+    parser.add_argument(
+        "--param", "-p", type=str, help="Parameters : path to json file or dict"
+    )
+    parser.add_argument("--is_darts", action="store_true")
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        type=int,
+        default=1,
+        help="Verbosity level, 0 to 2. Default is 1.",
+    )
+    args = parser.parse_args()
+    main(args)

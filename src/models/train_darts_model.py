@@ -8,6 +8,7 @@ from copy import deepcopy
 import argparse
 import pickle as pk
 from sklearn.metrics import r2_score
+
 from src.data.load_data import load_params, load_darts_timeseries
 from src.tools import check_path
 
@@ -21,11 +22,9 @@ def compute_R2(series_list, model, horizon, start, verbose=False):
             forecast_horizon=horizon,
             stride=1,
             retrain=False,
-            last_points_only=False,  # =horizon>1,
+            last_points_only=False,
             verbose=verbose,
         )
-        # pred_per_lag = []
-        # time_indices = []
         for i in range(horizon):
             pred_i = []
             time_i = []
@@ -33,9 +32,9 @@ def compute_R2(series_list, model, horizon, start, verbose=False):
                 pred_chunk_values = np.nan_to_num(pred_chunk.values(), copy=False)
                 pred_i.append(pred_chunk_values[i])
                 time_i.append(pred_chunk.time_index[i])
-            # pred_per_lag.append(np.array(pred_i))
-            # time_indices.append(np.array(time_i))
-            r2_list[i].append(r2_score(series.values()[time_i], pred_i, multioutput="raw_values"))
+            r2_list[i].append(
+                r2_score(series.values()[time_i], pred_i, multioutput="raw_values")
+            )
 
     return np.array(r2_list)
 
@@ -49,7 +48,9 @@ def train(params, data, verbose=1):
             torch.optim.lr_scheduler, params["model_params"]["lr_scheduler_cls"]
         )
     if "loss_fn" in params["model_params"]:
-        params["model_params"]["loss_fn"] = getattr(torch.nn, params["model_params"]["loss_fn"])()
+        params["model_params"]["loss_fn"] = getattr(
+            torch.nn, params["model_params"]["loss_fn"]
+        )()
 
     model = getattr(darts.models, params["model"])(**params["model_params"])
     start = (
@@ -57,11 +58,7 @@ def train(params, data, verbose=1):
         if hasattr(model, "input_chunk_length")
         else -min(model.lags["target"])
     )
-    horizon = 6
-    if "horizon" in params:
-        horizon = params["horizon"]
-    #else:
-    #    horizon = model.output_chunk_length if hasattr(model, "output_chunk_length") else 1
+    horizon = params["horizon"] if "horizon" in params else 6
 
     if verbose:
         print("Fitting model.")
@@ -71,7 +68,7 @@ def train(params, data, verbose=1):
 
     if verbose > 1:
         print("Computing training R2.")
-    tng_R2 = None # compute_R2(tng_series, model, horizon, start, verbose > 2)
+    tng_R2 = compute_R2(tng_series, model, horizon, start, verbose > 2)
     if verbose > 1:
         print("Computing validation R2.")
     val_R2 = compute_R2(val_series, model, horizon, start, verbose > 2)
@@ -82,27 +79,8 @@ def train(params, data, verbose=1):
     return model, tng_R2, val_R2
 
 
-def main():
+def main(args):
     """Train model using parameters dict and save results."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
-    parser.add_argument("--param", "-p", type=str, help="Parameters : path to json file or dict")
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        type=int,
-        default=1,
-        help="Verbosity level, 0 to 2. Default is 1.",
-    )
-    parser.add_argument(
-        "--base_dir",
-        "-b",
-        type=str,
-        help="Base directory for data files.",
-        default=None,
-    )
-    args = parser.parse_args()
-
     params_raw = load_params(args.param)
     params = deepcopy(params_raw)
     if args.base_dir:
@@ -142,4 +120,24 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
+    parser.add_argument(
+        "--param", "-p", type=str, help="Parameters : path to json file or dict"
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        type=int,
+        default=1,
+        help="Verbosity level, 0 to 2. Default is 1.",
+    )
+    parser.add_argument(
+        "--base_dir",
+        "-b",
+        type=str,
+        help="Base directory for data files.",
+        default=None,
+    )
+    args = parser.parse_args()
+    main(args)

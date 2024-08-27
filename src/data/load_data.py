@@ -3,7 +3,6 @@ import re
 import numpy as np
 import h5py
 import json
-import pickle as pk
 import torch
 from nilearn.connectome import ConnectivityMeasure
 from darts import TimeSeries
@@ -49,6 +48,7 @@ def load_data(path, task_filter=None, standardize=False, shuffle=False):
 
 
 def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=False):
+    """Load pre-processed data from HDF5 file and return a list of darts TimeSeries objects."""
     ts_list = []
     scaler = Scaler(scaler=StandardScaler())
     rng = np.random.default_rng()
@@ -66,7 +66,13 @@ def load_darts_timeseries(path, task_filter=None, standardize=False, shuffle=Fal
 
 
 def make_input_labels(
-    tng_data, val_data, seq_length, time_stride, lag, compute_edge_index=False, thres=0.9
+    tng_data,
+    val_data,
+    seq_length,
+    time_stride,
+    lag,
+    compute_edge_index=False,
+    thres=0.9,
 ):
     """Generate pairs of inputs and labels from time series.
 

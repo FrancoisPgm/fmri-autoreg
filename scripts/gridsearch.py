@@ -3,73 +3,40 @@ import csv
 from itertools import product as itertools_product
 import argparse
 from tqdm import tqdm
-from glob import glob
 from copy import deepcopy
-import darts.models
+
 from src.models.train_model import train
 from src.models.train_darts_model import train as train_darts
-from src.data.load_data import load_data, load_params, make_input_labels, load_darts_timeseries
+from src.data.load_data import (
+    load_data,
+    load_params,
+    make_input_labels,
+    load_darts_timeseries,
+)
+from src.tools import string_to_list
 
 
-def main():
-    print("starting")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", "-o", type=str, help="Output path.")
-    parser.add_argument(
-        "--base_dir", "-b", type=str, default="", help="Base directory for data files."
-    )
-    parser.add_argument(
-        "--param",
-        "-p",
-        type=str,
-        help="Path to the json file containing the hyper-parameters value to try.",
-    )
-    parser.add_argument(
-        "--device",
-        "-d",
-        type=str,
-        default="cuda:0",
-        help="Device for pytorch (cuda or cpu).",
-    )
-    parser.add_argument("--verbose", "-v", type=int, default=0)
-    parser.add_argument(
-        "--start",
-        type=int,
-        default=0,
-        help="Number of param combinations to skip.",
-    )
-    parser.add_argument(
-        "--amount",
-        type=int,
-        help="Amount of param combinations to do.",
-    )
-    parser.add_argument(
-        "--subject",
-        type=str,
-        help="Subject to use if not defined, the one in the params json file will be used.",
-    )
-    parser.add_argument(
-        "--atlas",
-        type=str,
-        help="Atlas to use, if not defined, the one in the params json file will be used.",
-    )
-    args = parser.parse_args()
-
+def main(args):
+    print("Starting gridsearch")
     params = load_params(args.param)
     is_darts = "model_params" in params
 
-    # change data parent folder, subject and atlas in file paths if necessary
-    if args.base_dir:
-        params["tng_data_file"] = os.path.join(args.base_dir, params["tng_data_file"])
-        params["val_data_file"] = os.path.join(args.base_dir, params["val_data_file"])
     if args.subject:
         sub_to_replace = "sub-" + params["tng_data_file"].split("sub-")[1][:2]
-        params["tng_data_file"] = params["tng_data_file"].replace(sub_to_replace, args.subject)
-        params["val_data_file"] = params["val_data_file"].replace(sub_to_replace, args.subject)
+        params["tng_data_file"] = params["tng_data_file"].replace(
+            sub_to_replace, args.subject
+        )
+        params["val_data_file"] = params["val_data_file"].replace(
+            sub_to_replace, args.subject
+        )
     if args.atlas:
         atlas_to_replace = "mist_" + params["tng_data_file"].split("mist_")[1][:3]
-        params["tng_data_file"] = params["tng_data_file"].replace(atlas_to_replace, args.atlas)
-        params["val_data_file"] = params["val_data_file"].replace(atlas_to_replace, args.atlas)
+        params["tng_data_file"] = params["tng_data_file"].replace(
+            atlas_to_replace, args.atlas
+        )
+        params["val_data_file"] = params["val_data_file"].replace(
+            atlas_to_replace, args.atlas
+        )
 
     # Set default values of params if necessary
     standardize = params["standardize"] if "standardize" in params else False
@@ -138,7 +105,7 @@ def main():
 
     # Write header to output file if it doesn't exist already
     else:
-        with open(out_path, "w") as out_file:
+        with open(args.output, "w") as out_file:
             writer = csv.DictWriter(out_file, fieldnames=fieldnames)
             writer.writeheader()
 
@@ -151,10 +118,10 @@ def main():
     trial_params = deepcopy(params)
     print("param list created")
     start = args.start + n_trials_already_done
-    end = args.start + args.amount if args.amount else len(params_list)
+    end = args.start + args.amount if args.amount else len(param_list)
 
     if is_darts:  # darts model
-        data = tng_series, val_series
+        data = tng_data, val_data
         for trials_values in tqdm(param_list[start:end]):
             for i, val in enumerate(trials_values):
                 trial_params["model_params"][grid_keys[i]] = val
@@ -173,7 +140,7 @@ def main():
                 res_dict["r2_mean_val"] = r2_val_means[i]
                 res_dict["r2_std_val"] = r2_val_stds[i]
 
-                with open(out_path, "a") as out_file:
+                with open(args.output, "a") as out_file:
                     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                     writer.writerow(res_dict)
 
@@ -205,7 +172,7 @@ def main():
                 trial_params["loss_tng"] = losses["tng"][-1]
                 trial_params["loss_val"] = losses["val"][-1]
 
-            with open(out_path, "a") as out_file:
+            with open(args.output, "a") as out_file:
                 writer = csv.DictWriter(out_file, fieldnames=fieldnames)
                 writer.writerow(trial_params)
                 for checkpoint in checkpoints:
@@ -216,4 +183,42 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser("Run a gridsearch.")
+    parser.add_argument("--output", "-o", type=str, help="Output path.")
+    parser.add_argument(
+        "--param",
+        "-p",
+        type=str,
+        help="Path to the json file containing the hyper-parameters value to try.",
+    )
+    parser.add_argument(
+        "--device",
+        "-d",
+        type=str,
+        default="cuda:0",
+        help="Device for pytorch (cuda or cpu).",
+    )
+    parser.add_argument("--verbose", "-v", type=int, default=0)
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=0,
+        help="Number of param combinations to skip.",
+    )
+    parser.add_argument(
+        "--amount",
+        type=int,
+        help="Amount of param combinations to do.",
+    )
+    parser.add_argument(
+        "--subject",
+        type=str,
+        help="Subject to use if not defined, the one in the params json file will be used.",
+    )
+    parser.add_argument(
+        "--atlas",
+        type=str,
+        help="Atlas to use, if not defined, the one in the params json file will be used.",
+    )
+    args = parser.parse_args()
+    main(args)

@@ -40,22 +40,29 @@ def cortical_segmentation(target_img):
     mask_cerebellum = mtx_extra >= 9000
     mask_cortex = (mtx_extra > 0) & ~mask_central & ~mask_cerebellum
     img = dict.fromkeys(["central", "cerebellum", "cortex"])
-    img["central"] = _resample_segmentation(image.new_img_like(img_aal, mask_central), target_img)
+    img["central"] = _resample_segmentation(
+        image.new_img_like(img_aal, mask_central), target_img
+    )
     img["cerebellum"] = _resample_segmentation(
         image.new_img_like(img_aal, mask_cerebellum), target_img
     )
-    img["cortex"] = _resample_segmentation(image.new_img_like(img_aal, mask_cortex), target_img)
+    img["cortex"] = _resample_segmentation(
+        image.new_img_like(img_aal, mask_cortex), target_img
+    )
     return img
 
 
 def get_cortical_ROI_indices(atlas_path):
+    """Get indices of the ROIs in each cortical region."""
     cort_mask = cortical_segmentation(atlas_path)
     atlas_data = nb.load(atlas_path).get_fdata()
     cort_indices_overlap = {}
     cort_indices_no_overlap = {}
     # Get ROI indices in each cortical region (with possibly same ROI in multiple cortical region)
     for region, img in cort_mask.items():
-        indices, counts = np.unique(atlas_data[img.get_fdata().astype(bool)], return_counts=True)
+        indices, counts = np.unique(
+            atlas_data[img.get_fdata().astype(bool)], return_counts=True
+        )
         cort_indices_overlap[region] = dict(zip(indices, counts))
         cort_indices_no_overlap[region] = []
     # Re-assign ROI indices in the region that contain the most voxels of this ROI,
@@ -73,8 +80,11 @@ def get_cortical_ROI_indices(atlas_path):
 
 
 def apply_cort_seg(data, cort_idx, mean=False):
+    """Average the values of 'data' per cortical region."""
     seg_data = {}
     for region, indices in cort_idx.items():
-        indices = [i - 1 for i in indices]  # -1 because MIST regions are numbered from 1
+        indices = [
+            i - 1 for i in indices
+        ]  # -1 because MIST regions are numbered from 1
         seg_data[region] = data[indices].mean() if mean else data[indices]
     return seg_data

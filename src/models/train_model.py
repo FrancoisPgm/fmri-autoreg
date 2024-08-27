@@ -6,6 +6,7 @@ import pickle as pk
 import csv
 from math import ceil
 from sklearn.metrics import r2_score
+
 from src.data.load_data import load_params, load_data, make_input_labels
 from src.models.make_model import make_model
 from src.tools import check_path
@@ -68,27 +69,8 @@ def train(params, data, verbose=1):
     return model, r2_tng, r2_val, Z_tng, Y_tng, Z_val, Y_val, losses, checkpoints
 
 
-def main():
-    """Train model using parameters dict and save results."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
-    parser.add_argument("--param", "-p", type=str, help="Parameters : path to json file or dict")
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        type=int,
-        default=1,
-        help="Verbosity level, 0 to 2. Default is 1.",
-    )
-    parser.add_argument(
-        "--base_dir",
-        "-b",
-        type=str,
-        help="Base directory for data files.",
-        default=None,
-    )
-    args = parser.parse_args()
-
+def main(args):
+    """Train a model and save the results."""
     params = load_params(args.param)
     if args.base_dir:
         params["tng_data_file"] = os.path.join(args.base_dir, params["tng_data_file"])
@@ -160,8 +142,26 @@ def main():
             writer.writerows(checkpoints)
 
     if args.verbose:
-        print("Results saved at {}".format(output_dir))
+        print(f"Results saved in {output_dir}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser("Train a model and save the results.")
+    parser.add_argument("--output_dir", "-o", type=str, help="output directory")
+    parser.add_argument("--param", "-p", type=str, help="Parameters : path to json file or dict")
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        type=int,
+        default=1,
+        help="Verbosity level, 0 to 2. Default is 1.",
+    )
+    parser.add_argument(
+        "--base_dir",
+        "-b",
+        type=str,
+        help="Base directory for data files.",
+        default=None,
+    )
+    args = parser.parse_args()
+    main(args)

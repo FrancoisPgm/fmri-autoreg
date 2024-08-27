@@ -2,8 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch_geometric.nn import ChebConv
-import torch.nn.functional as F
-from sklearn import linear_model
+
 from src.tools import string_to_list
 
 
@@ -142,9 +141,13 @@ class Chebnet(nn.Module):
         if FC_type == "shared_uni":
             make_FC_layer = nn.Linear
         elif FC_type == "nonshared_uni":
-            make_FC_layer = lambda f_in, f_out: NonsharedFC(n_emb, f_in, f_out)
+
+            def make_FC_layer(f_in, f_out):
+                return NonsharedFC(n_emb, f_in, f_out)
         elif FC_type == "multi":
-            make_FC_layer = lambda f_in, f_out: MultiFC(n_emb, f_in, f_out)
+
+            def make_FC_layer(f_in, f_out):
+                return MultiFC(n_emb, f_in, f_out)
         else:
             raise ValueError(
                 f"Invalid FC_type : '{FC_type}'. Valid values are 'shared_uni', 'nonshared_uni', 'multi'."

@@ -2,12 +2,11 @@ import os
 import re
 import argparse
 import numpy as np
-import nibabel as nib
-import pickle as pk
 from glob import glob
 from tqdm import tqdm
 import nilearn.interfaces
-from nilearn.maskers import NiftiMasker, NiftiLabelsMasker, NiftiSpheresMasker
+from nilearn.maskers import NiftiMasker, NiftiSpheresMasker
+
 from src.data.load_data import load_params
 from src.tools import load_model
 from src.data.preprocess import LOAD_CONFOUNDS_PARAMS
@@ -31,10 +30,14 @@ def main(args):
         "*_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz"
     )
     file_list = [p for p in file_list if re.search(args.task_filter, p)]
-    confounds, _ = nilearn.interfaces.fmriprep.load_confounds(file_list, **LOAD_CONFOUNDS_PARAMS)
+    confounds, _ = nilearn.interfaces.fmriprep.load_confounds(
+        file_list, **LOAD_CONFOUNDS_PARAMS
+    )
 
     model_path = (
-        args.model if os.path.splitext(args.model)[1] else os.path.join(args.model, "model.pkl")
+        args.model
+        if os.path.splitext(args.model)[1]
+        else os.path.join(args.model, "model.pkl")
     )
     model = load_model(model_path)
     params = load_params(os.path.join(os.path.dirname(model_path), "params.json"))
@@ -56,7 +59,6 @@ def main(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     for i, file_path in tqdm(enumerate(file_list)):
-        predictions = {}
         filename = os.path.split(file_path)[1].replace(".nii.gz", "")
 
         _, pred, atlas_series = predict_horizon(
@@ -72,7 +74,9 @@ def main(args):
             smoothing_fwhm=5,
         )
 
-        brain_time_series = brain_masker.fit_transform(file_path, confounds=confounds[i])
+        brain_time_series = brain_masker.fit_transform(
+            file_path, confounds=confounds[i]
+        )
         brain_time_series = brain_time_series[params["seq_length"] :]
         for seed, n_ROI in seeds_ROI.items():
             seed_time_series = atlas_series[:, n_ROI, 0]
@@ -80,7 +84,9 @@ def main(args):
                 np.dot(brain_time_series[: -HORIZON + 1].T, seed_time_series)
                 / seed_time_series.shape[0]
             )
-            out_path = os.path.join(args.out_dir, f"{filename}_{seed}_original_connectivity.nii.gz")
+            out_path = os.path.join(
+                args.out_dir, f"{filename}_{seed}_original_connectivity.nii.gz"
+            )
             brain_masker.inverse_transform(seed_vox_corr.T).to_filename(out_path)
             for lag in range(HORIZON):
                 seed_time_series = pred[:, n_ROI, lag]
@@ -90,11 +96,12 @@ def main(args):
                     / seed_time_series.shape[0]
                 )
                 out_path = os.path.join(
-                    args.out_dir, f"{filename}_{seed}_prediction_{lag}_connectivity.nii.gz"
+                    args.out_dir,
+                    f"{filename}_{seed}_prediction_{lag}_connectivity.nii.gz",
                 )
-                brain_masker.inverse_transform(seed_vox_corr.T.astype(np.float32)).to_filename(
-                    out_path
-                )
+                brain_masker.inverse_transform(
+                    seed_vox_corr.T.astype(np.float32)
+                ).to_filename(out_path)
 
 
 if __name__ == "__main__":
@@ -114,7 +121,9 @@ if __name__ == "__main__":
         type=str,
         help="Dataset folder to use for voxel data.",
     )
-    parser.add_argument("--task_filter", type=str, help="Regular expression to select runs.")
+    parser.add_argument(
+        "--task_filter", type=str, help="Regular expression to select runs."
+    )
     parser.add_argument("--subject", type=str, help="Subject to use (e.g. 'sub-01').")
     parser.add_argument(
         "--model",

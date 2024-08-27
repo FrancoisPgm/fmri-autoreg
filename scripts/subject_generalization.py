@@ -5,7 +5,6 @@ import torch
 import argparse
 import numpy as np
 import os
-import pickle as pk
 from tqdm import tqdm
 from src.data.load_data import load_params
 from src.tools import load_model
@@ -15,25 +14,19 @@ SUBS = [f"sub-0{i}" for i in range(1, 7)]
 HORIZON = 6
 
 
-def main():
-    "Load model and compute score on several tasks data."
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", "-o", type=str, help="Output directory path.")
-    parser.add_argument("--model", "-m", type=str, help="Path to model file or dir.")
-    parser.add_argument("--task_filter", "-t", type=str, help="Regex string to filter runs.")
-    parser.add_argument("--data_file", "-f", type=str, help="Path to data HDF5 file.")
-    parser.add_argument(
-        "--base_dir", "-b", type=str, default=None, help="Base directory for data files."
-    )
-    parser.add_argument("--verbose", "-v", type=int, default=0, help="Level of verbosity.")
-    args = parser.parse_args()
+def main(args):
+    """Load a model and compute score on other subjects' data."""
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Working on {device}.")
 
     model_sub = "sub-" + args.model.split("sub-")[1][:2]
     sub_list = [sub for sub in SUBS if sub != model_sub]
 
-    model_path = args.model if os.path.isfile(args.model) else os.path.join(args.model, "model.pkl")
+    model_path = (
+        args.model
+        if os.path.isfile(args.model)
+        else os.path.join(args.model, "model.pkl")
+    )
     model = load_model(model_path)
     if isinstance(model, torch.nn.Module):
         model.to(torch.device(device)).eval()
@@ -45,7 +38,9 @@ def main():
         print(f"{model_sub}'s model predicting on {sub}'s data.")
 
         model_path = (
-            args.model if os.path.isfile(args.model) else os.path.join(args.model, "model.pkl")
+            args.model
+            if os.path.isfile(args.model)
+            else os.path.join(args.model, "model.pkl")
         )
         data_file_path = re.sub("sub-..", sub, args.data_file)
         data_file = h5py.File(data_file_path, "r")
@@ -53,7 +48,8 @@ def main():
         valid_runs = [
             run
             for run in all_runs
-            if data_file[run][:].shape[0] > params["seq_length"] and re.search(args.task_filter, run)
+            if data_file[run][:].shape[0] > params["seq_length"]
+            and re.search(args.task_filter, run)
         ]
         data_file.close()
         sub_dir = os.path.splitext(os.path.split(data_file_path)[1])[0]
@@ -61,7 +57,9 @@ def main():
         if out_dir is None:
             out_dir = os.path.join(os.path.dirname(model_path), "predict_horizon")
         os.makedirs(os.path.join(out_dir, sub_dir), exist_ok=True)
-        with open(os.path.join(out_dir, sub_dir, f"params.json"), "w") as params_out_file:
+        with open(
+            os.path.join(out_dir, sub_dir, "params.json"), "w"
+        ) as params_out_file:
             json.dump(params, params_out_file, indent=4)
 
         for run in tqdm(valid_runs, desc="runs"):
@@ -73,9 +71,24 @@ def main():
             np.save(os.path.join(out_dir, sub_dir, f"r2_{suffixe}.npy"), r2)
             np.save(os.path.join(out_dir, sub_dir, f"Z_{suffixe}.npy"), Z)
             np.save(os.path.join(out_dir, sub_dir, f"Y_{suffixe}.npy"), Y)
-            with open(os.path.join(out_dir, sub_dir, f"params.json"), "w") as params_out_file:
+            with open(
+                os.path.join(out_dir, sub_dir, "params.json"), "w"
+            ) as params_out_file:
                 json.dump(params, params_out_file, indent=4)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        "Load a model and compute score on other subjects' data."
+    )
+    parser.add_argument("--output", "-o", type=str, help="Output directory path.")
+    parser.add_argument("--model", "-m", type=str, help="Path to model file or dir.")
+    parser.add_argument(
+        "--task_filter", "-t", type=str, help="Regex string to filter runs."
+    )
+    parser.add_argument("--data_file", "-f", type=str, help="Path to data HDF5 file.")
+    parser.add_argument(
+        "--verbose", "-v", type=int, default=0, help="Level of verbosity."
+    )
+    args = parser.parse_args()
+    main(args)
